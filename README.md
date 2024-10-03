@@ -6,9 +6,7 @@ RFP-Response Analyzer is a Flask-based web application that uses AI to analyze a
 
 Watch a demo of the RFP-Response Analyzer in action:
 
-<div align="center">
-  <iframe width="100%" height="500" src="https://www.youtube.com/embed/aqrYpZ2Pe3A" frameborder="0" allowfullscreen></iframe>
-</div>
+[![Watch the video](https://img.youtube.com/vi/aqrYpZ2Pe3A/maxresdefault.jpg)](https://www.youtube.com/watch?v=aqrYpZ2Pe3A)
 
 ## Features
 
