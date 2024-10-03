@@ -23,7 +23,7 @@ Watch a demo of the RFP-Response Analyzer in action:
 1. Clone the repository:
 
     ```bash
-    git clone [https://github.com/your-username/rfp-response-analyzer.git](https://github.com/lesteroliver911/openai-rfp-response-analyzer)
+    git clone [https://github.com/lesteroliver911/openai-rfp-response-analyzer](https://github.com/lesteroliver911/openai-rfp-response-analyzer)
     cd rfp-response-analyzer
     ```
 
