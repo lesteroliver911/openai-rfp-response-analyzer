@@ -19,7 +19,7 @@ RFP-Response Analyzer is a Flask-based web application that uses AI to analyze a
 1. Clone the repository:
 
     ```bash
-    git clone [https://github.com/lesteroliver911/openai-rfp-response-analyzer](https://github.com/lesteroliver911/openai-rfp-response-analyzer)
+    git clone [https://github.com/lesteroliver911/openai-rfp-response-analyzer]
     cd rfp-response-analyzer
     ```
 
