@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ignitec AI - RFP Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .chat-messages {
+            height: calc(100vh - 280px);
+            overflow-y: auto;
+        }
+        @media (max-width: 640px) {
+            .chat-messages {
+                height: calc(100vh - 360px);
+            }
+        }
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 150ms;
+        }
+    </style>
+</head>
+<body class="h-full" x-data="{ activeTab: 'report', isMobileMenuOpen: false }">
+    <div class="flex flex-col h-full lg:flex-row">
+        <!-- Left Column - User Actions -->
+        <div class="w-full lg:w-1/3 bg-white p-6 overflow-y-auto border-b lg:border-r border-gray-200">
+            <div class="mb-6">
+                <h1 class="text-3xl font-bold text-indigo-800">RFP Analyzer</h1>
+                <p class="text-sm text-gray-600">Ignitec AI</p>
+            </div>
+            
+            <form id="uploadForm" enctype="multipart/form-data" class="space-y-4 mb-6">
+                <div>
+                    <label for="rfpFile" class="block text-sm font-medium text-gray-700">RFP File</label>
+                    <input class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" type="file" id="rfpFile" name="rfp" accept=".pdf" required aria-required="true">
+                </div>
+                <div>
+                    <label for="responseFile" class="block text-sm font-medium text-gray-700">Response File</label>
+                    <input class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" type="file" id="responseFile" name="response" accept=".pdf" required aria-required="true">
+                </div>
+            </form>
+            
+            <button onclick="processDocuments()" id="processBtn" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 hover:bg-indigo-500 transition-all flex items-center justify-center" aria-label="Process Documents">
+                <span>Process Documents</span>
+                <svg id="processingSpinner" class="animate-spin ml-2 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+            
+            <div id="processingStatus" class="mt-4 p-4 rounded-lg bg-blue-50 text-blue-700 hidden transition-all" role="status" aria-live="polite"></div>
+            
+            <button onclick="generateReport()" id="generateReportBtn" class="w-full mt-4 bg-green-600 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 hover:bg-green-500 transition-all hidden" aria-label="Generate Report">Generate Report</button>
+            
+            <div id="instructions" class="mt-8 bg-gray-50 p-4 rounded-lg shadow-sm">
+                <h2 class="text-lg font-semibold mb-2 text-indigo-700">Instructions:</h2>
+                <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                    <li>Upload RFP and Response PDF files.</li>
+                    <li>Click "Process Documents" to analyze them.</li>
+                    <li>Click "Generate Report" for an automatic analysis.</li>
+                    <li>Use the chat interface to ask specific questions about the documents.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Right Column - Output and Chat -->
+        <div class="w-full lg:w-2/3 bg-gray-50 p-6 flex flex-col">
+            <div class="mb-4">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                        <a href="#" class="border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" 
+                           :class="{ 'border-indigo-500 text-indigo-600': activeTab === 'report', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'report' }"
+                           @click.prevent="activeTab = 'report'"
+                           aria-controls="report-tab"
+                           :aria-selected="activeTab === 'report'">
+                            Report
+                        </a>
+                        <a href="#" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm" 
+                           :class="{ 'border-indigo-500 text-indigo-600': activeTab === 'chat', 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300': activeTab !== 'chat' }"
+                           @click.prevent="activeTab = 'chat'"
+                           aria-controls="chat-tab"
+                           :aria-selected="activeTab === 'chat'">
+                            Chat
+                        </a>
+                    </nav>
+                </div>
+            </div>
+
+            <div class="flex-grow overflow-y-auto">
+                <!-- Report Section -->
+                <div x-show="activeTab === 'report'" x-cloak id="report-tab" role="tabpanel" aria-labelledby="report-tab">
+                    <div id="report" class="bg-white shadow-sm rounded-lg p-6">
+                        <!-- Report content will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Chat Interface -->
+                <div x-show="activeTab === 'chat'" x-cloak id="chat-tab" role="tabpanel" aria-labelledby="chat-tab">
+                    <div id="chat-container" class="bg-white shadow-sm rounded-lg">
+                        <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h2 class="text-lg font-medium text-indigo-900">Chat with AI Assistant</h2>
+                            <button onclick="clearChat()" class="text-sm text-indigo-600 hover:text-indigo-800 transition-colors" aria-label="Clear Chat">Clear Chat</button>
+                        </div>
+                        <div class="border-t border-gray-200">
+                            <div id="chat-messages" class="chat-messages sm:divide-y sm:divide-gray-200 p-4" aria-live="polite"></div>
+                            <div class="px-4 py-4 bg-gray-50 rounded-b-lg">
+                                <form id="chatForm" class="flex space-x-3" onsubmit="sendChatMessage(event)">
+                                    <input type="text" id="chat-input" class="flex-grow rounded-lg border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Type your question here..." aria-label="Chat input">
+                                    <button type="submit" id="chat-send" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all" aria-label="Send message">
+                                        Send
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function processDocuments() {
+            const form = document.getElementById('uploadForm');
+            const formData = new FormData(form);
+            
+            if (formData.get('rfp') && formData.get('response')) {
+                const processBtn = document.getElementById('processBtn');
+                const processingStatus = document.getElementById('processingStatus');
+                const processingSpinner = document.getElementById('processingSpinner');
+                processBtn.disabled = true;
+                processBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                processingSpinner.classList.remove('hidden');
+                processingStatus.classList.remove('hidden');
+                processingStatus.innerHTML = 'Processing documents...';
+                
+                try {
+                    const response = await fetch('/process', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        processingStatus.classList.remove('bg-blue-50', 'text-blue-700');
+                        processingStatus.classList.add('bg-green-50', 'text-green-700');
+                        processingStatus.textContent = result.message;
+                        processBtn.classList.add('hidden');
+                        document.getElementById('generateReportBtn').classList.remove('hidden');
+                    } else {
+                        throw new Error(result.error || 'An error occurred while processing documents');
+                    }
+                } catch (error) {
+                    processingStatus.classList.remove('bg-blue-50', 'text-blue-700');
+                    processingStatus.classList.add('bg-red-50', 'text-red-700');
+                    processingStatus.textContent = `Error: ${error.message}`;
+                    processBtn.disabled = false;
+                    processBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                } finally {
+                    processingSpinner.classList.add('hidden');
+                }
+            } else {
+                alert("Please upload both RFP and Response PDF files.");
+            }
+        }
+
+        async function generateReport() {
+            const generateReportBtn = document.getElementById('generateReportBtn');
+            const report = document.getElementById('report');
+            generateReportBtn.disabled = true;
+            generateReportBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            report.innerHTML = 'Generating report... <svg class="animate-spin h-5 w-5 text-indigo-500 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+
+            try {
+                const response = await fetch('/generate_report', {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    report.innerHTML = result.structured_report;
+                    generateReportBtn.classList.add('hidden');
+                } else {
+                    throw new Error(result.error || 'An error occurred while generating the report');
+                }
+            } catch (error) {
+                report.innerHTML = `<div class="bg-red-50 border-l-4 border-red-400 p-4 text-red-700" role="alert">Error: ${error.message}</div>`;
+                generateReportBtn.disabled = false;
+                generateReportBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        async function sendChatMessage(event) {
+            event.preventDefault();
+            const chatInput = document.getElementById('chat-input');
+            const message = chatInput.value.trim();
+            if (message === '') return;
+
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML += `<div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 bg-gray-50"><dt class="text-sm font-medium text-gray-500">You</dt><dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">${message}</dd></div>`;
+            chatInput.value = '';
+
+            chatMessages.innerHTML += '<div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4"><dt class="text-sm font-medium text-gray-500">AI</dt><dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2"><svg class="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg></dd></div>';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: message }),
+                });
+                const result = await response.json();
+
+                chatMessages.removeChild(chatMessages.lastElementChild); // Remove loading indicator
+
+                if (response.ok) {
+                    chatMessages.innerHTML += `<div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4"><dt class="text-sm font-medium text-indigo-600">AI</dt><dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">${result.response}</dd></div>`;
+                } else {
+                    throw new Error(result.error || 'An error occurred while processing your message');
+                }
+            } catch (error) {
+                chatMessages.innerHTML += `<div class="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4"><dt class="text-sm font-medium text-red-500">Error</dt><dd class="mt-1 text-sm text-red-700 sm:mt-0 sm:col-span-2">${error.message}</dd></div>`;
+            } finally {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        }
+
+        function clearChat() {
+            const chatMessages = document.getElementById('chat-messages');
+            chatMessages.innerHTML = '';
+        }
+    </script>
+</body>
+</html>
